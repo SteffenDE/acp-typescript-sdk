@@ -66,8 +66,7 @@ export class AgentSideConnection {
           if (!agent.forkSession) {
             throw RequestError.methodNotFound(method);
           }
-          const validatedParams =
-            schema.forkSessionRequestSchema.parse(params);
+          const validatedParams = schema.forkSessionRequestSchema.parse(params);
           return agent.forkSession(validatedParams);
         }
         case schema.AGENT_METHODS.session_set_mode: {

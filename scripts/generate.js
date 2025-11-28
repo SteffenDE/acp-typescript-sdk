@@ -55,18 +55,25 @@ async function downloadSchemas(tag) {
 /**
  * Preprocesses the JSON schema to fix issues with json-schema-to-typescript.
  *
- * The upstream schema uses empty objects {} in anyOf arrays to represent
- * extension types. json-schema-to-typescript interprets {} as "any type",
- * which causes union types to collapse and not be generated.
- *
- * This function:
- * 1. Adds titles to empty {} objects based on their parent definition name
- * 2. Adds titles to $ref entries in anyOf arrays for proper type generation
+ * Issues fixed:
+ * 1. Empty objects {} in anyOf arrays - the library interprets {} as "any type",
+ *    causing union types to collapse. We add titles to make them proper types.
+ * 2. Discriminated unions with allOf[$ref] + properties - the library doesn't
+ *    merge the discriminator property into the generated type. We flatten these
+ *    by resolving refs and merging properties.
  */
 function preprocessSchema(schema) {
   const defs = schema.$defs;
   if (!defs) return;
 
+  // First pass: fix discriminated unions (oneOf with allOf + properties pattern)
+  for (const [defName, def] of Object.entries(defs)) {
+    if (def.oneOf && def.discriminator) {
+      flattenDiscriminatedUnion(def, defs);
+    }
+  }
+
+  // Second pass: fix empty objects and missing titles in anyOf
   for (const [defName, def] of Object.entries(defs)) {
     if (!def.anyOf) continue;
 
@@ -75,7 +82,6 @@ function preprocessSchema(schema) {
 
       // Fix empty objects - add a title based on parent name
       if (Object.keys(item).length === 0) {
-        // Infer title from parent: AgentResponse -> ExtMethodResponse, etc.
         const extTitle = defName.replace(/^(Agent|Client)/, "ExtMethod");
         item.title = extTitle;
         continue;
@@ -88,6 +94,69 @@ function preprocessSchema(schema) {
       }
     }
   }
+}
+
+/**
+ * Flattens a discriminated union by resolving allOf refs and merging properties.
+ *
+ * Transforms:
+ *   { allOf: [{ $ref: "#/$defs/Foo" }], properties: { disc: { const: "x" } } }
+ * Into:
+ *   { title: "...", type: "object", properties: { ...Foo.properties, disc: { const: "x" } }, required: [...] }
+ */
+function flattenDiscriminatedUnion(def, defs) {
+  const discriminatorProp = def.discriminator.propertyName;
+
+  for (let i = 0; i < def.oneOf.length; i++) {
+    const variant = def.oneOf[i];
+
+    // Skip if no allOf with $ref
+    if (!variant.allOf || variant.allOf.length === 0) continue;
+
+    const refEntry = variant.allOf.find((a) => a.$ref);
+    if (!refEntry) continue;
+
+    // Resolve the $ref
+    const refName = refEntry.$ref.split("/").pop();
+    const refDef = defs[refName];
+    if (!refDef) continue;
+
+    // Get discriminator value for title
+    const discValue = variant.properties?.[discriminatorProp]?.const;
+    const title =
+      variant.title || (discValue ? pascalCase(discValue) : `${refName}Variant`);
+
+    // Merge properties from ref and variant
+    const mergedProperties = {
+      ...(refDef.properties || {}),
+      ...(variant.properties || {}),
+    };
+
+    // Merge required fields
+    const mergedRequired = [
+      ...new Set([...(refDef.required || []), ...(variant.required || [])]),
+    ];
+
+    // Replace variant with flattened version
+    def.oneOf[i] = {
+      title,
+      type: "object",
+      properties: mergedProperties,
+      required: mergedRequired,
+    };
+
+    // Copy description if present
+    if (variant.description) {
+      def.oneOf[i].description = variant.description;
+    }
+  }
+}
+
+function pascalCase(str) {
+  return str
+    .split("_")
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join("");
 }
 
 const jsonSchema = JSON.parse(
