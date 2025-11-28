@@ -52,10 +52,50 @@ async function downloadSchemas(tag) {
   console.log("Schema files downloaded successfully\n");
 }
 
+/**
+ * Preprocesses the JSON schema to fix issues with json-schema-to-typescript.
+ *
+ * The upstream schema uses empty objects {} in anyOf arrays to represent
+ * extension types. json-schema-to-typescript interprets {} as "any type",
+ * which causes union types to collapse and not be generated.
+ *
+ * This function:
+ * 1. Adds titles to empty {} objects based on their parent definition name
+ * 2. Adds titles to $ref entries in anyOf arrays for proper type generation
+ */
+function preprocessSchema(schema) {
+  const defs = schema.$defs;
+  if (!defs) return;
+
+  for (const [defName, def] of Object.entries(defs)) {
+    if (!def.anyOf) continue;
+
+    for (let i = 0; i < def.anyOf.length; i++) {
+      const item = def.anyOf[i];
+
+      // Fix empty objects - add a title based on parent name
+      if (Object.keys(item).length === 0) {
+        // Infer title from parent: AgentResponse -> ExtMethodResponse, etc.
+        const extTitle = defName.replace(/^(Agent|Client)/, "ExtMethod");
+        item.title = extTitle;
+        continue;
+      }
+
+      // Add title to $ref entries if missing
+      if (item.$ref && !item.title) {
+        const refName = item.$ref.split("/").pop();
+        item.title = refName;
+      }
+    }
+  }
+}
+
 const jsonSchema = JSON.parse(
   await fs.readFile("./schema/schema.json", "utf8"),
 );
 const metadata = JSON.parse(await fs.readFile("./schema/meta.json", "utf8"));
+
+preprocessSchema(jsonSchema);
 
 const tsSrc = await compile(jsonSchema, "Agent Client Protocol", {
   additionalProperties: false,
