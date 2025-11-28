@@ -56,7 +56,7 @@ export type AgentOutgoingMessage1 =
     }
   | (
       | {
-          result: unknown;
+          result: AgentResponse;
         }
       | {
           error: Error;
@@ -183,6 +183,56 @@ export type ToolCallStatus = "pending" | "in_progress" | "completed" | "failed";
  */
 export type ToolCallId = string;
 /**
+ * All possible responses that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
+ *
+ * These are responses to the corresponding `ClientRequest` variants.
+ */
+/** @internal */
+export type AgentResponse =
+  | InitializeResponse
+  | AuthenticateResponse
+  | NewSessionResponse
+  | LoadSessionResponse
+  | ListSessionsResponse
+  | ForkSessionResponse
+  | SetSessionModeResponse
+  | PromptResponse
+  | SetSessionModelResponse
+  | ExtMethodResponse;
+/**
+ * Protocol version identifier.
+ *
+ * This version is only bumped for breaking changes.
+ * Non-breaking changes should be introduced via capabilities.
+ */
+export type ProtocolVersion = number;
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * A unique identifier for a model.
+ */
+export type ModelId = string;
+/**
+ * Unique identifier for a Session Mode.
+ */
+export type SessionModeId = string;
+/**
+ * Reasons why an agent stops processing a prompt turn.
+ *
+ * See protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/prompt-turn#stop-reasons)
+ */
+export type StopReason =
+  | "end_turn"
+  | "max_tokens"
+  | "max_turn_requests"
+  | "refusal"
+  | "cancelled";
+/**
  * All possible notifications that an agent can send to a client.
  *
  * This enum is used internally for routing RPC notifications. You typically won't need
@@ -230,10 +280,6 @@ export type PlanEntryStatus = "pending" | "in_progress" | "completed";
  */
 export type AvailableCommandInput = UnstructuredCommandInput;
 /**
- * Unique identifier for a Session Mode.
- */
-export type SessionModeId = string;
-/**
  * A message (request, response, or notification) with `"jsonrpc": "2.0"` specified as
  * [required by JSON-RPC 2.0 Specification][1].
  *
@@ -261,7 +307,7 @@ export type ClientOutgoingMessage1 =
     }
   | (
       | {
-          result: unknown;
+          result: ClientResponse;
         }
       | {
           error: Error;
@@ -294,13 +340,6 @@ export type ClientRequest =
       [k: string]: unknown;
     };
 /**
- * Protocol version identifier.
- *
- * This version is only bumped for breaking changes.
- * Non-breaking changes should be introduced via capabilities.
- */
-export type ProtocolVersion = number;
-/**
  * Configuration for connecting to an MCP (Model Context Protocol) server.
  *
  * MCP servers provide tools and context that the agent can use when
@@ -310,13 +349,32 @@ export type ProtocolVersion = number;
  */
 export type McpServer = McpServerHttp | McpServerSse | McpServerStdio;
 /**
- * **UNSTABLE**
+ * All possible responses that a client can send to an agent.
  *
- * This capability is not part of the spec yet, and may be removed or changed at any point.
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
  *
- * A unique identifier for a model.
+ * These are responses to the corresponding `AgentRequest` variants.
  */
-export type ModelId = string;
+/** @internal */
+export type ClientResponse =
+  | WriteTextFileResponse
+  | ReadTextFileResponse
+  | RequestPermissionResponse
+  | CreateTerminalResponse
+  | TerminalOutputResponse
+  | ReleaseTerminalResponse
+  | WaitForTerminalExitResponse
+  | KillTerminalCommandResponse
+  | ExtMethodResponse1;
+/**
+ * The outcome of a permission request.
+ */
+export type RequestPermissionOutcome =
+  | {
+      outcome: "cancelled";
+    }
+  | SelectedPermissionOutcome;
 /**
  * All possible notifications that a client can send to an agent.
  *
@@ -823,6 +881,530 @@ export interface KillTerminalCommandRequest {
   terminalId: string;
 }
 /**
+ * Response to the `initialize` method.
+ *
+ * Contains the negotiated protocol version and agent capabilities.
+ *
+ * See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/initialization)
+ */
+export interface InitializeResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Capabilities supported by the agent.
+   */
+  agentCapabilities?: AgentCapabilities;
+  /**
+   * Information about the Agent name and version sent to the Client.
+   *
+   * Note: in future versions of the protocol, this will be required.
+   */
+  agentInfo?: Implementation | null;
+  /**
+   * Authentication methods supported by the agent.
+   */
+  authMethods?: AuthMethod[];
+  /**
+   * The protocol version the client specified if supported by the agent,
+   * or the latest protocol version supported by the agent.
+   *
+   * The client should disconnect, if it doesn't support this version.
+   */
+  protocolVersion: ProtocolVersion;
+}
+/**
+ * Capabilities supported by the agent.
+ *
+ * Advertised during initialization to inform the client about
+ * available features and content types.
+ *
+ * See protocol docs: [Agent Capabilities](https://agentclientprotocol.com/protocol/initialization#agent-capabilities)
+ */
+export interface AgentCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Whether the agent supports `session/load`.
+   */
+  loadSession?: boolean;
+  /**
+   * MCP capabilities supported by the agent.
+   */
+  mcpCapabilities?: McpCapabilities;
+  /**
+   * Prompt capabilities supported by the agent.
+   */
+  promptCapabilities?: PromptCapabilities;
+  sessionCapabilities?: SessionCapabilities;
+}
+/**
+ * MCP capabilities supported by the agent
+ */
+export interface McpCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Agent supports [`McpServer::Http`].
+   */
+  http?: boolean;
+  /**
+   * Agent supports [`McpServer::Sse`].
+   */
+  sse?: boolean;
+}
+/**
+ * Prompt capabilities supported by the agent in `session/prompt` requests.
+ *
+ * Baseline agent functionality requires support for [`ContentBlock::Text`]
+ * and [`ContentBlock::ResourceLink`] in prompt requests.
+ *
+ * Other variants must be explicitly opted in to.
+ * Capabilities for different types of content in prompt requests.
+ *
+ * Indicates which content types beyond the baseline (text and resource links)
+ * the agent can process.
+ *
+ * See protocol docs: [Prompt Capabilities](https://agentclientprotocol.com/protocol/initialization#prompt-capabilities)
+ */
+export interface PromptCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Agent supports [`ContentBlock::Audio`].
+   */
+  audio?: boolean;
+  /**
+   * Agent supports embedded context in `session/prompt` requests.
+   *
+   * When enabled, the Client is allowed to include [`ContentBlock::Resource`]
+   * in prompt requests for pieces of context that are referenced in the message.
+   */
+  embeddedContext?: boolean;
+  /**
+   * Agent supports [`ContentBlock::Image`].
+   */
+  image?: boolean;
+}
+/**
+ * Session capabilities supported by the agent.
+ *
+ * As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
+ *
+ * Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
+ *
+ * Note: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.
+ *
+ * See protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)
+ */
+export interface SessionCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Whether the agent supports `session/fork`.
+   */
+  fork?: SessionForkCapabilities | null;
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Whether the agent supports `session/list`.
+   */
+  list?: SessionListCapabilities | null;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Capabilities for the `session/fork` method.
+ *
+ * By supplying `{}` it means that the agent supports forking of sessions.
+ */
+export interface SessionForkCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Capabilities for the `session/list` method.
+ *
+ * By supplying `{}` it means that the agent supports listing of sessions.
+ *
+ * Further capabilities can be added in the future for other means of filtering or searching the list.
+ */
+export interface SessionListCapabilities {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Metadata about the implementation of the client or agent.
+ * Describes the name and version of an MCP implementation, with an optional
+ * title for UI representation.
+ */
+export interface Implementation {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Intended for programmatic or logical use, but can be used as a display
+   * name fallback if title isn’t present.
+   */
+  name: string;
+  /**
+   * Intended for UI and end-user contexts — optimized to be human-readable
+   * and easily understood.
+   *
+   * If not provided, the name should be used for display.
+   */
+  title?: string | null;
+  /**
+   * Version of the implementation. Can be displayed to the user or used
+   * for debugging or metrics purposes. (e.g. "1.0.0").
+   */
+  version: string;
+}
+/**
+ * Describes an available authentication method.
+ */
+export interface AuthMethod {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Optional description providing more details about this authentication method.
+   */
+  description?: string | null;
+  /**
+   * Unique identifier for this authentication method.
+   */
+  id: string;
+  /**
+   * Human-readable name of the authentication method.
+   */
+  name: string;
+}
+/**
+ * Response to the `authenticate` method.
+ */
+export interface AuthenticateResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Response from creating a new session.
+ *
+ * See protocol docs: [Creating a Session](https://agentclientprotocol.com/protocol/session-setup#creating-a-session)
+ */
+export interface NewSessionResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Initial model state if supported by the Agent
+   */
+  models?: SessionModelState | null;
+  /**
+   * Initial mode state if supported by the Agent
+   *
+   * See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
+   */
+  modes?: SessionModeState | null;
+  /**
+   * Unique identifier for the created session.
+   *
+   * Used in all subsequent requests for this conversation.
+   */
+  sessionId: SessionId;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * The set of models and the one currently active.
+ */
+export interface SessionModelState {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The set of models that the Agent can use
+   */
+  availableModels: ModelInfo[];
+  /**
+   * The current model the Agent is in.
+   */
+  currentModelId: ModelId;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Information about a selectable model.
+ */
+export interface ModelInfo {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Optional description of the model.
+   */
+  description?: string | null;
+  /**
+   * Unique identifier for the model.
+   */
+  modelId: ModelId;
+  /**
+   * Human-readable name of the model.
+   */
+  name: string;
+}
+/**
+ * The set of modes and the one currently active.
+ */
+export interface SessionModeState {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The set of modes that the Agent can operate in
+   */
+  availableModes: SessionMode[];
+  /**
+   * The current mode the Agent is in.
+   */
+  currentModeId: SessionModeId;
+}
+/**
+ * A mode the agent can operate in.
+ *
+ * See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
+ */
+export interface SessionMode {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  description?: string | null;
+  id: SessionModeId;
+  name: string;
+}
+/**
+ * Response from loading an existing session.
+ */
+export interface LoadSessionResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Initial model state if supported by the Agent
+   */
+  models?: SessionModelState | null;
+  /**
+   * Initial mode state if supported by the Agent
+   *
+   * See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
+   */
+  modes?: SessionModeState | null;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response from listing sessions.
+ */
+export interface ListSessionsResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Opaque cursor token. If present, pass this in the next request's cursor parameter
+   * to fetch the next page. If absent, there are no more results.
+   */
+  nextCursor?: string | null;
+  /**
+   * Array of session information objects
+   */
+  sessions: SessionInfo[];
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Information about a session returned by session/list
+ */
+export interface SessionInfo {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The working directory for this session. Must be an absolute path.
+   */
+  cwd: string;
+  /**
+   * Unique identifier for the session
+   */
+  sessionId: SessionId;
+  /**
+   * Human-readable title for the session
+   */
+  title?: string | null;
+  /**
+   * ISO 8601 timestamp of last activity
+   */
+  updatedAt?: string | null;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response from forking an existing session.
+ */
+export interface ForkSessionResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Initial model state if supported by the Agent
+   */
+  models?: SessionModelState | null;
+  /**
+   * Initial mode state if supported by the Agent
+   *
+   * See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
+   */
+  modes?: SessionModeState | null;
+  /**
+   * Unique identifier for the newly created forked session.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Response to `session/set_mode` method.
+ */
+export interface SetSessionModeResponse {
+  _meta?: unknown;
+}
+/**
+ * Response from processing a user prompt.
+ *
+ * See protocol docs: [Check for Completion](https://agentclientprotocol.com/protocol/prompt-turn#4-check-for-completion)
+ */
+export interface PromptResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Indicates why the agent stopped processing the turn.
+   */
+  stopReason: StopReason;
+}
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response to `session/set_model` method.
+ */
+export interface SetSessionModelResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+export interface ExtMethodResponse {
+  [k: string]: unknown;
+}
+/**
  * JSON-RPC error object.
  *
  * Represents an error that occurred during method execution, following the
@@ -1140,36 +1722,6 @@ export interface FileSystemCapability {
   writeTextFile?: boolean;
 }
 /**
- * Metadata about the implementation of the client or agent.
- * Describes the name and version of an MCP implementation, with an optional
- * title for UI representation.
- */
-export interface Implementation {
-  /**
-   * Extension point for implementations
-   */
-  _meta?: {
-    [k: string]: unknown;
-  };
-  /**
-   * Intended for programmatic or logical use, but can be used as a display
-   * name fallback if title isn’t present.
-   */
-  name: string;
-  /**
-   * Intended for UI and end-user contexts — optimized to be human-readable
-   * and easily understood.
-   *
-   * If not provided, the name should be used for display.
-   */
-  title?: string | null;
-  /**
-   * Version of the implementation. Can be displayed to the user or used
-   * for debugging or metrics purposes. (e.g. "1.0.0").
-   */
-  version: string;
-}
-/**
  * Request parameters for the authenticate method.
  *
  * Specifies which authentication method to use.
@@ -1454,6 +2006,160 @@ export interface SetSessionModelRequest {
   sessionId: SessionId;
 }
 /**
+ * Response to `fs/write_text_file`
+ */
+export interface WriteTextFileResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Response containing the contents of a text file.
+ */
+export interface ReadTextFileResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  content: string;
+}
+/**
+ * Response to a permission request.
+ */
+export interface RequestPermissionResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The user's decision on the permission request.
+   */
+  outcome: RequestPermissionOutcome;
+}
+/**
+ * The user selected one of the provided options.
+ */
+export interface SelectedPermissionOutcome {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The ID of the option the user selected.
+   */
+  optionId: PermissionOptionId;
+}
+/**
+ * Response containing the ID of the created terminal.
+ */
+export interface CreateTerminalResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The unique identifier for the created terminal.
+   */
+  terminalId: string;
+}
+/**
+ * Response containing the terminal output and exit status.
+ */
+export interface TerminalOutputResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Exit status if the command has completed.
+   */
+  exitStatus?: TerminalExitStatus | null;
+  /**
+   * The terminal output captured so far.
+   */
+  output: string;
+  /**
+   * Whether the output was truncated due to byte limits.
+   */
+  truncated: boolean;
+}
+/**
+ * Exit status of a terminal command.
+ */
+export interface TerminalExitStatus {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The process exit code (may be null if terminated by signal).
+   */
+  exitCode?: number | null;
+  /**
+   * The signal that terminated the process (may be null if exited normally).
+   */
+  signal?: string | null;
+}
+/**
+ * Response to terminal/release method
+ */
+export interface ReleaseTerminalResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Response containing the exit status of a terminal command.
+ */
+export interface WaitForTerminalExitResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * The process exit code (may be null if terminated by signal).
+   */
+  exitCode?: number | null;
+  /**
+   * The signal that terminated the process (may be null if exited normally).
+   */
+  signal?: string | null;
+}
+/**
+ * Response to terminal/kill command method
+ */
+export interface KillTerminalCommandResponse {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: {
+    [k: string]: unknown;
+  };
+}
+export interface ExtMethodResponse1 {
+  [k: string]: unknown;
+}
+/**
  * Notification to cancel ongoing operations for a session.
  *
  * See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/prompt-turn#cancellation)
@@ -1551,6 +2257,48 @@ export const toolCallStatusSchema = z.union([
 export const toolCallIdSchema = z.string();
 
 /** @internal */
+export const authenticateResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const setSessionModeResponseSchema = z.object({
+  _meta: z.unknown().optional(),
+});
+
+/** @internal */
+export const setSessionModelResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const extMethodResponseSchema = z.record(z.unknown());
+
+/** @internal */
+export const protocolVersionSchema = z.number();
+
+/** @internal */
+export const modelIdSchema = z.string();
+
+/** @internal */
+export const sessionModeIdSchema = z.string();
+
+/** @internal */
+export const stopReasonSchema = z.union([
+  z.literal("end_turn"),
+  z.literal("max_tokens"),
+  z.literal("max_turn_requests"),
+  z.literal("refusal"),
+  z.literal("cancelled"),
+]);
+
+/** @internal */
+export const currentModeUpdateSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  currentModeId: sessionModeIdSchema,
+});
+
+/** @internal */
 export const planEntryPrioritySchema = z.union([
   z.literal("high"),
   z.literal("medium"),
@@ -1569,9 +2317,6 @@ export const unstructuredCommandInputSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   hint: z.string(),
 });
-
-/** @internal */
-export const sessionModeIdSchema = z.string();
 
 /** @internal */
 export const authenticateRequestSchema = z.object({
@@ -1600,10 +2345,54 @@ export const setSessionModeRequestSchema = z.object({
 });
 
 /** @internal */
-export const protocolVersionSchema = z.number();
+export const setSessionModelRequestSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  modelId: modelIdSchema,
+  sessionId: sessionIdSchema,
+});
 
 /** @internal */
-export const modelIdSchema = z.string();
+export const writeTextFileResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const readTextFileResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  content: z.string(),
+});
+
+/** @internal */
+export const createTerminalResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  terminalId: z.string(),
+});
+
+/** @internal */
+export const releaseTerminalResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const waitForTerminalExitResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  exitCode: z.number().optional().nullable(),
+  signal: z.string().optional().nullable(),
+});
+
+/** @internal */
+export const killTerminalCommandResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const extMethodResponse1Schema = z.record(z.unknown());
+
+/** @internal */
+export const selectedPermissionOutcomeSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  optionId: permissionOptionIdSchema,
+});
 
 /** @internal */
 export const cancelNotificationSchema = z.object({
@@ -1722,6 +2511,100 @@ export const killTerminalCommandRequestSchema = z.object({
 });
 
 /** @internal */
+export const implementationSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  name: z.string(),
+  title: z.string().optional().nullable(),
+  version: z.string(),
+});
+
+/** @internal */
+export const authMethodSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  description: z.string().optional().nullable(),
+  id: z.string(),
+  name: z.string(),
+});
+
+/** @internal */
+export const mcpCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  http: z.boolean().optional(),
+  sse: z.boolean().optional(),
+});
+
+/** @internal */
+export const promptCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  audio: z.boolean().optional(),
+  embeddedContext: z.boolean().optional(),
+  image: z.boolean().optional(),
+});
+
+/** @internal */
+export const sessionForkCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const sessionListCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+});
+
+/** @internal */
+export const modelInfoSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  description: z.string().optional().nullable(),
+  modelId: modelIdSchema,
+  name: z.string(),
+});
+
+/** @internal */
+export const sessionModeSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  description: z.string().optional().nullable(),
+  id: sessionModeIdSchema,
+  name: z.string(),
+});
+
+/** @internal */
+export const sessionModelStateSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  availableModels: z.array(modelInfoSchema),
+  currentModelId: modelIdSchema,
+});
+
+/** @internal */
+export const sessionModeStateSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  availableModes: z.array(sessionModeSchema),
+  currentModeId: sessionModeIdSchema,
+});
+
+/** @internal */
+export const sessionInfoSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  cwd: z.string(),
+  sessionId: sessionIdSchema,
+  title: z.string().optional().nullable(),
+  updatedAt: z.string().optional().nullable(),
+});
+
+/** @internal */
+export const forkSessionResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  models: sessionModelStateSchema.optional().nullable(),
+  modes: sessionModeStateSchema.optional().nullable(),
+  sessionId: sessionIdSchema,
+});
+
+/** @internal */
+export const promptResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  stopReason: stopReasonSchema,
+});
+
+/** @internal */
 export const planEntrySchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   content: z.string(),
@@ -1731,20 +2614,6 @@ export const planEntrySchema = z.object({
 
 /** @internal */
 export const availableCommandInputSchema = unstructuredCommandInputSchema;
-
-/** @internal */
-export const currentModeUpdateSchema = z.object({
-  _meta: z.record(z.unknown()).optional(),
-  currentModeId: sessionModeIdSchema,
-});
-
-/** @internal */
-export const implementationSchema = z.object({
-  _meta: z.record(z.unknown()).optional(),
-  name: z.string(),
-  title: z.string().optional().nullable(),
-  version: z.string(),
-});
 
 /** @internal */
 export const fileSystemCapabilitySchema = z.object({
@@ -1778,10 +2647,18 @@ export const mcpServerStdioSchema = z.object({
 });
 
 /** @internal */
-export const setSessionModelRequestSchema = z.object({
+export const requestPermissionOutcomeSchema = z.union([
+  z.object({
+    outcome: z.literal("cancelled"),
+  }),
+  selectedPermissionOutcomeSchema,
+]);
+
+/** @internal */
+export const terminalExitStatusSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
-  modelId: modelIdSchema,
-  sessionId: sessionIdSchema,
+  exitCode: z.number().optional().nullable(),
+  signal: z.string().optional().nullable(),
 });
 
 /** @internal */
@@ -1810,6 +2687,28 @@ export const embeddedResourceSchema = z.object({
 });
 
 /** @internal */
+export const newSessionResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  models: sessionModelStateSchema.optional().nullable(),
+  modes: sessionModeStateSchema.optional().nullable(),
+  sessionId: sessionIdSchema,
+});
+
+/** @internal */
+export const loadSessionResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  models: sessionModelStateSchema.optional().nullable(),
+  modes: sessionModeStateSchema.optional().nullable(),
+});
+
+/** @internal */
+export const listSessionsResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  nextCursor: z.string().optional().nullable(),
+  sessions: z.array(sessionInfoSchema),
+});
+
+/** @internal */
 export const planSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   entries: z.array(planEntrySchema),
@@ -1830,6 +2729,20 @@ export const mcpServerHttpSchema = z.object({
 });
 
 /** @internal */
+export const requestPermissionResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  outcome: requestPermissionOutcomeSchema,
+});
+
+/** @internal */
+export const terminalOutputResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  exitStatus: terminalExitStatusSchema.optional().nullable(),
+  output: z.string(),
+  truncated: z.boolean(),
+});
+
+/** @internal */
 export const contentBlockSchema = z.union([
   textContentSchema,
   imageContentSchema,
@@ -1837,6 +2750,13 @@ export const contentBlockSchema = z.union([
   resourceLinkSchema,
   embeddedResourceSchema,
 ]);
+
+/** @internal */
+export const sessionCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  fork: sessionForkCapabilitiesSchema.optional().nullable(),
+  list: sessionListCapabilitiesSchema.optional().nullable(),
+});
 
 /** @internal */
 export const contentChunkSchema = z.object({
@@ -1894,6 +2814,19 @@ export const availableCommandsUpdateSchema = z.object({
 });
 
 /** @internal */
+export const clientResponseSchema = z.union([
+  writeTextFileResponseSchema,
+  readTextFileResponseSchema,
+  requestPermissionResponseSchema,
+  createTerminalResponseSchema,
+  terminalOutputResponseSchema,
+  releaseTerminalResponseSchema,
+  waitForTerminalExitResponseSchema,
+  killTerminalCommandResponseSchema,
+  extMethodResponse1Schema,
+]);
+
+/** @internal */
 export const initializeRequestSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   clientCapabilities: clientCapabilitiesSchema.optional(),
@@ -1916,6 +2849,15 @@ export const toolCallContentSchema = z.union([
 ]);
 
 /** @internal */
+export const agentCapabilitiesSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  loadSession: z.boolean().optional(),
+  mcpCapabilities: mcpCapabilitiesSchema.optional(),
+  promptCapabilities: promptCapabilitiesSchema.optional(),
+  sessionCapabilities: sessionCapabilitiesSchema.optional(),
+});
+
+/** @internal */
 export const toolCallSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   content: z.array(toolCallContentSchema).optional(),
@@ -1926,6 +2868,15 @@ export const toolCallSchema = z.object({
   status: toolCallStatusSchema.optional(),
   title: z.string(),
   toolCallId: toolCallIdSchema,
+});
+
+/** @internal */
+export const initializeResponseSchema = z.object({
+  _meta: z.record(z.unknown()).optional(),
+  agentCapabilities: agentCapabilitiesSchema.optional(),
+  agentInfo: implementationSchema.optional().nullable(),
+  authMethods: z.array(authMethodSchema).optional(),
+  protocolVersion: protocolVersionSchema,
 });
 
 /** @internal */
@@ -1987,6 +2938,20 @@ export const agentRequestSchema = z.union([
 ]);
 
 /** @internal */
+export const agentResponseSchema = z.union([
+  initializeResponseSchema,
+  authenticateResponseSchema,
+  newSessionResponseSchema,
+  loadSessionResponseSchema,
+  listSessionsResponseSchema,
+  forkSessionResponseSchema,
+  setSessionModeResponseSchema,
+  promptResponseSchema,
+  setSessionModelResponseSchema,
+  extMethodResponseSchema,
+]);
+
+/** @internal */
 export const sessionNotificationSchema = z.object({
   _meta: z.record(z.unknown()).optional(),
   sessionId: sessionIdSchema,
@@ -2002,7 +2967,7 @@ export const clientOutgoingMessage1Schema = z.union([
   }),
   z.union([
     z.object({
-      result: z.unknown(),
+      result: clientResponseSchema,
     }),
     z.object({
       error: errorSchema,
@@ -2036,7 +3001,7 @@ export const agentOutgoingMessage1Schema = z.union([
   }),
   z.union([
     z.object({
-      result: z.unknown(),
+      result: agentResponseSchema,
     }),
     z.object({
       error: errorSchema,
