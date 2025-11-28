@@ -7,7 +7,7 @@ import { dirname } from "path";
 
 const CURRENT_SCHEMA_RELEASE = "v0.6.3";
 
-await downloadSchemas(CURRENT_SCHEMA_RELEASE);
+// await downloadSchemas(CURRENT_SCHEMA_RELEASE);
 
 /**
  * Downloads a file from a URL to a local path
