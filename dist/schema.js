@@ -414,14 +414,15 @@ export const httpHeaderSchema = z.object({
     value: z.string(),
 });
 /** @internal */
-export const mcpServerSseSchema = z.object({
+export const sseSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     headers: z.array(httpHeaderSchema),
     name: z.string(),
     url: z.string(),
+    type: z.literal("sse"),
 });
 /** @internal */
-export const mcpServerStdioSchema = z.object({
+export const mcpServerStdioVariantSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     args: z.array(z.string()),
     command: z.string(),
@@ -496,11 +497,12 @@ export const clientNotificationSchema = z.union([
     z.record(z.unknown()),
 ]);
 /** @internal */
-export const mcpServerHttpSchema = z.object({
+export const httpSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     headers: z.array(httpHeaderSchema),
     name: z.string(),
     url: z.string(),
+    type: z.literal("http"),
 });
 /** @internal */
 export const requestPermissionResponseSchema = z.object({
@@ -561,9 +563,9 @@ export const clientCapabilitiesSchema = z.object({
 });
 /** @internal */
 export const mcpServerSchema = z.union([
-    mcpServerHttpSchema,
-    mcpServerSseSchema,
-    mcpServerStdioSchema,
+    httpSchema,
+    sseSchema,
+    mcpServerStdioVariantSchema,
 ]);
 /** @internal */
 export const loadSessionRequestSchema = z.object({

@@ -268,7 +268,7 @@ export type ClientRequest = InitializeRequest | AuthenticateRequest | NewSession
  *
  * See protocol docs: [MCP Servers](https://agentclientprotocol.com/protocol/session-setup#mcp-servers)
  */
-export type McpServer = McpServerHttp | McpServerSse | McpServerStdio;
+export type McpServer = Http | Sse | McpServerStdioVariant;
 /**
  * All possible responses that a client can send to an agent.
  *
@@ -1760,9 +1760,11 @@ export interface NewSessionRequest {
     mcpServers: McpServer[];
 }
 /**
- * HTTP transport configuration for MCP.
+ * HTTP transport configuration
+ *
+ * Only available when the Agent capabilities indicate `mcp_capabilities.http` is `true`.
  */
-export interface McpServerHttp {
+export interface Http {
     /**
      * Extension point for implementations
      */
@@ -1781,6 +1783,7 @@ export interface McpServerHttp {
      * URL to the MCP server.
      */
     url: string;
+    type: "http";
 }
 /**
  * An HTTP header to set when making requests to the MCP server.
@@ -1802,9 +1805,11 @@ export interface HttpHeader {
     value: string;
 }
 /**
- * SSE transport configuration for MCP.
+ * SSE transport configuration
+ *
+ * Only available when the Agent capabilities indicate `mcp_capabilities.sse` is `true`.
  */
-export interface McpServerSse {
+export interface Sse {
     /**
      * Extension point for implementations
      */
@@ -1823,11 +1828,14 @@ export interface McpServerSse {
      * URL to the MCP server.
      */
     url: string;
+    type: "sse";
 }
 /**
- * Stdio transport configuration for MCP.
+ * Stdio transport configuration
+ *
+ * All Agents MUST support this transport.
  */
-export interface McpServerStdio {
+export interface McpServerStdioVariant {
     /**
      * Extension point for implementations
      */
@@ -2863,13 +2871,13 @@ export declare const mcpCapabilitiesSchema: z.ZodObject<{
     http: z.ZodOptional<z.ZodBoolean>;
     sse: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    _meta?: Record<string, unknown> | undefined;
     http?: boolean | undefined;
     sse?: boolean | undefined;
+    _meta?: Record<string, unknown> | undefined;
 }, {
-    _meta?: Record<string, unknown> | undefined;
     http?: boolean | undefined;
     sse?: boolean | undefined;
+    _meta?: Record<string, unknown> | undefined;
 }>;
 /** @internal */
 export declare const promptCapabilitiesSchema: z.ZodObject<{
@@ -3231,7 +3239,7 @@ export declare const httpHeaderSchema: z.ZodObject<{
     _meta?: Record<string, unknown> | undefined;
 }>;
 /** @internal */
-export declare const mcpServerSseSchema: z.ZodObject<{
+export declare const sseSchema: z.ZodObject<{
     _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     headers: z.ZodArray<z.ZodObject<{
         _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -3248,7 +3256,9 @@ export declare const mcpServerSseSchema: z.ZodObject<{
     }>, "many">;
     name: z.ZodString;
     url: z.ZodString;
+    type: z.ZodLiteral<"sse">;
 }, "strip", z.ZodTypeAny, {
+    type: "sse";
     name: string;
     headers: {
         value: string;
@@ -3258,6 +3268,7 @@ export declare const mcpServerSseSchema: z.ZodObject<{
     url: string;
     _meta?: Record<string, unknown> | undefined;
 }, {
+    type: "sse";
     name: string;
     headers: {
         value: string;
@@ -3268,7 +3279,7 @@ export declare const mcpServerSseSchema: z.ZodObject<{
     _meta?: Record<string, unknown> | undefined;
 }>;
 /** @internal */
-export declare const mcpServerStdioSchema: z.ZodObject<{
+export declare const mcpServerStdioVariantSchema: z.ZodObject<{
     _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     args: z.ZodArray<z.ZodString, "many">;
     command: z.ZodString;
@@ -3867,7 +3878,7 @@ export declare const clientNotificationSchema: z.ZodUnion<[z.ZodObject<{
     _meta?: Record<string, unknown> | undefined;
 }>, z.ZodRecord<z.ZodString, z.ZodUnknown>]>;
 /** @internal */
-export declare const mcpServerHttpSchema: z.ZodObject<{
+export declare const httpSchema: z.ZodObject<{
     _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     headers: z.ZodArray<z.ZodObject<{
         _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -3884,7 +3895,9 @@ export declare const mcpServerHttpSchema: z.ZodObject<{
     }>, "many">;
     name: z.ZodString;
     url: z.ZodString;
+    type: z.ZodLiteral<"http">;
 }, "strip", z.ZodTypeAny, {
+    type: "http";
     name: string;
     headers: {
         value: string;
@@ -3894,6 +3907,7 @@ export declare const mcpServerHttpSchema: z.ZodObject<{
     url: string;
     _meta?: Record<string, unknown> | undefined;
 }, {
+    type: "http";
     name: string;
     headers: {
         value: string;
@@ -5647,7 +5661,9 @@ export declare const mcpServerSchema: z.ZodUnion<[z.ZodObject<{
     }>, "many">;
     name: z.ZodString;
     url: z.ZodString;
+    type: z.ZodLiteral<"http">;
 }, "strip", z.ZodTypeAny, {
+    type: "http";
     name: string;
     headers: {
         value: string;
@@ -5657,6 +5673,7 @@ export declare const mcpServerSchema: z.ZodUnion<[z.ZodObject<{
     url: string;
     _meta?: Record<string, unknown> | undefined;
 }, {
+    type: "http";
     name: string;
     headers: {
         value: string;
@@ -5682,7 +5699,9 @@ export declare const mcpServerSchema: z.ZodUnion<[z.ZodObject<{
     }>, "many">;
     name: z.ZodString;
     url: z.ZodString;
+    type: z.ZodLiteral<"sse">;
 }, "strip", z.ZodTypeAny, {
+    type: "sse";
     name: string;
     headers: {
         value: string;
@@ -5692,6 +5711,7 @@ export declare const mcpServerSchema: z.ZodUnion<[z.ZodObject<{
     url: string;
     _meta?: Record<string, unknown> | undefined;
 }, {
+    type: "sse";
     name: string;
     headers: {
         value: string;
@@ -5760,7 +5780,9 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"http">;
     }, "strip", z.ZodTypeAny, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -5770,6 +5792,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -5795,7 +5818,9 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"sse">;
     }, "strip", z.ZodTypeAny, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -5805,6 +5830,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -5857,6 +5883,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
     cwd: string;
     sessionId: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -5876,6 +5903,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -5890,6 +5918,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
     cwd: string;
     sessionId: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -5909,6 +5938,7 @@ export declare const loadSessionRequestSchema: z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -7063,7 +7093,9 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"http">;
     }, "strip", z.ZodTypeAny, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -7073,6 +7105,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -7098,7 +7131,9 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"sse">;
     }, "strip", z.ZodTypeAny, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -7108,6 +7143,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -7158,6 +7194,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     cwd: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -7177,6 +7214,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -7190,6 +7228,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
 }, {
     cwd: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -7209,6 +7248,7 @@ export declare const newSessionRequestSchema: z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -7683,13 +7723,13 @@ export declare const agentCapabilitiesSchema: z.ZodObject<{
         http: z.ZodOptional<z.ZodBoolean>;
         sse: z.ZodOptional<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
-        _meta?: Record<string, unknown> | undefined;
         http?: boolean | undefined;
         sse?: boolean | undefined;
+        _meta?: Record<string, unknown> | undefined;
     }, {
-        _meta?: Record<string, unknown> | undefined;
         http?: boolean | undefined;
         sse?: boolean | undefined;
+        _meta?: Record<string, unknown> | undefined;
     }>>;
     promptCapabilities: z.ZodOptional<z.ZodObject<{
         _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -7744,9 +7784,9 @@ export declare const agentCapabilitiesSchema: z.ZodObject<{
     _meta?: Record<string, unknown> | undefined;
     loadSession?: boolean | undefined;
     mcpCapabilities?: {
-        _meta?: Record<string, unknown> | undefined;
         http?: boolean | undefined;
         sse?: boolean | undefined;
+        _meta?: Record<string, unknown> | undefined;
     } | undefined;
     promptCapabilities?: {
         image?: boolean | undefined;
@@ -7767,9 +7807,9 @@ export declare const agentCapabilitiesSchema: z.ZodObject<{
     _meta?: Record<string, unknown> | undefined;
     loadSession?: boolean | undefined;
     mcpCapabilities?: {
-        _meta?: Record<string, unknown> | undefined;
         http?: boolean | undefined;
         sse?: boolean | undefined;
+        _meta?: Record<string, unknown> | undefined;
     } | undefined;
     promptCapabilities?: {
         image?: boolean | undefined;
@@ -9140,13 +9180,13 @@ export declare const initializeResponseSchema: z.ZodObject<{
             http: z.ZodOptional<z.ZodBoolean>;
             sse: z.ZodOptional<z.ZodBoolean>;
         }, "strip", z.ZodTypeAny, {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         }, {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         }>>;
         promptCapabilities: z.ZodOptional<z.ZodObject<{
             _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -9201,9 +9241,9 @@ export declare const initializeResponseSchema: z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -9224,9 +9264,9 @@ export declare const initializeResponseSchema: z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -9284,9 +9324,9 @@ export declare const initializeResponseSchema: z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -9323,9 +9363,9 @@ export declare const initializeResponseSchema: z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -12187,7 +12227,9 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"http">;
     }, "strip", z.ZodTypeAny, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12197,6 +12239,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12222,7 +12265,9 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"sse">;
     }, "strip", z.ZodTypeAny, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12232,6 +12277,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12282,6 +12328,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     cwd: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12301,6 +12348,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12314,6 +12362,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
 }, {
     cwd: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12333,6 +12382,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12363,7 +12413,9 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"http">;
     }, "strip", z.ZodTypeAny, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12373,6 +12425,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12398,7 +12451,9 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }>, "many">;
         name: z.ZodString;
         url: z.ZodString;
+        type: z.ZodLiteral<"sse">;
     }, "strip", z.ZodTypeAny, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12408,6 +12463,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         url: string;
         _meta?: Record<string, unknown> | undefined;
     }, {
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12460,6 +12516,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
     cwd: string;
     sessionId: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12479,6 +12536,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -12493,6 +12551,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
     cwd: string;
     sessionId: string;
     mcpServers: ({
+        type: "sse";
         name: string;
         headers: {
             value: string;
@@ -12512,6 +12571,7 @@ export declare const clientRequestSchema: z.ZodUnion<[z.ZodObject<{
         }[];
         _meta?: Record<string, unknown> | undefined;
     } | {
+        type: "http";
         name: string;
         headers: {
             value: string;
@@ -17264,13 +17324,13 @@ export declare const agentResponseSchema: z.ZodUnion<[z.ZodObject<{
             http: z.ZodOptional<z.ZodBoolean>;
             sse: z.ZodOptional<z.ZodBoolean>;
         }, "strip", z.ZodTypeAny, {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         }, {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         }>>;
         promptCapabilities: z.ZodOptional<z.ZodObject<{
             _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -17325,9 +17385,9 @@ export declare const agentResponseSchema: z.ZodUnion<[z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -17348,9 +17408,9 @@ export declare const agentResponseSchema: z.ZodUnion<[z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -17408,9 +17468,9 @@ export declare const agentResponseSchema: z.ZodUnion<[z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -17447,9 +17507,9 @@ export declare const agentResponseSchema: z.ZodUnion<[z.ZodObject<{
         _meta?: Record<string, unknown> | undefined;
         loadSession?: boolean | undefined;
         mcpCapabilities?: {
-            _meta?: Record<string, unknown> | undefined;
             http?: boolean | undefined;
             sse?: boolean | undefined;
+            _meta?: Record<string, unknown> | undefined;
         } | undefined;
         promptCapabilities?: {
             image?: boolean | undefined;
@@ -22537,7 +22597,9 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22547,6 +22609,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22572,7 +22635,9 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22582,6 +22647,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22632,6 +22698,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
     }, "strip", z.ZodTypeAny, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22651,6 +22718,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22664,6 +22732,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
     }, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22683,6 +22752,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22713,7 +22783,9 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22723,6 +22795,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22748,7 +22821,9 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22758,6 +22833,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22810,6 +22886,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22829,6 +22906,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -22843,6 +22921,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -22862,6 +22941,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -23365,6 +23445,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -23384,6 +23465,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -23487,6 +23569,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -23506,6 +23589,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -23542,6 +23626,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -23561,6 +23646,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -23664,6 +23750,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -23683,6 +23770,7 @@ export declare const clientOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24062,7 +24150,9 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24072,6 +24162,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24097,7 +24188,9 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24107,6 +24200,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24157,6 +24251,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
     }, "strip", z.ZodTypeAny, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24176,6 +24271,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24189,6 +24285,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
     }, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24208,6 +24305,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24238,7 +24336,9 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24248,6 +24348,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24273,7 +24374,9 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24283,6 +24386,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24335,6 +24439,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24354,6 +24459,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24368,6 +24474,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24387,6 +24494,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -24890,6 +24998,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -24909,6 +25018,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -25012,6 +25122,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -25031,6 +25142,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -25067,6 +25179,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -25086,6 +25199,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -25189,6 +25303,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -25208,6 +25323,7 @@ export declare const clientOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -27834,13 +27950,13 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
                 http: z.ZodOptional<z.ZodBoolean>;
                 sse: z.ZodOptional<z.ZodBoolean>;
             }, "strip", z.ZodTypeAny, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }>>;
             promptCapabilities: z.ZodOptional<z.ZodObject<{
                 _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -27895,9 +28011,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -27918,9 +28034,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -27978,9 +28094,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -28017,9 +28133,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -28586,9 +28702,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -28714,9 +28830,9 @@ export declare const agentOutgoingMessage1Schema: z.ZodUnion<[z.ZodObject<{
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -34591,13 +34707,13 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
                 http: z.ZodOptional<z.ZodBoolean>;
                 sse: z.ZodOptional<z.ZodBoolean>;
             }, "strip", z.ZodTypeAny, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }>>;
             promptCapabilities: z.ZodOptional<z.ZodObject<{
                 _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -34652,9 +34768,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -34675,9 +34791,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -34735,9 +34851,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -34774,9 +34890,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -35343,9 +35459,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -35471,9 +35587,9 @@ export declare const agentOutgoingMessageSchema: z.ZodIntersection<z.ZodUnion<[z
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -41354,13 +41470,13 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
                 http: z.ZodOptional<z.ZodBoolean>;
                 sse: z.ZodOptional<z.ZodBoolean>;
             }, "strip", z.ZodTypeAny, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }, {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             }>>;
             promptCapabilities: z.ZodOptional<z.ZodObject<{
                 _meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
@@ -41415,9 +41531,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -41438,9 +41554,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -41498,9 +41614,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -41537,9 +41653,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -42106,9 +42222,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -42234,9 +42350,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             _meta?: Record<string, unknown> | undefined;
             loadSession?: boolean | undefined;
             mcpCapabilities?: {
-                _meta?: Record<string, unknown> | undefined;
                 http?: boolean | undefined;
                 sse?: boolean | undefined;
+                _meta?: Record<string, unknown> | undefined;
             } | undefined;
             promptCapabilities?: {
                 image?: boolean | undefined;
@@ -46899,7 +47015,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -46909,6 +47027,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -46934,7 +47053,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -46944,6 +47065,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -46994,6 +47116,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
     }, "strip", z.ZodTypeAny, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47013,6 +47136,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47026,6 +47150,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
     }, {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47045,6 +47170,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47075,7 +47201,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"http">;
         }, "strip", z.ZodTypeAny, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47085,6 +47213,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47110,7 +47239,9 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }>, "many">;
             name: z.ZodString;
             url: z.ZodString;
+            type: z.ZodLiteral<"sse">;
         }, "strip", z.ZodTypeAny, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47120,6 +47251,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             url: string;
             _meta?: Record<string, unknown> | undefined;
         }, {
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47172,6 +47304,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47191,6 +47324,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47205,6 +47339,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47224,6 +47359,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47727,6 +47863,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47746,6 +47883,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47849,6 +47987,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47868,6 +48007,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -47904,6 +48044,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
         cwd: string;
         sessionId: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -47923,6 +48064,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
@@ -48026,6 +48168,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
     } | {
         cwd: string;
         mcpServers: ({
+            type: "sse";
             name: string;
             headers: {
                 value: string;
@@ -48045,6 +48188,7 @@ export declare const agentClientProtocolSchema: z.ZodUnion<[z.ZodIntersection<z.
             }[];
             _meta?: Record<string, unknown> | undefined;
         } | {
+            type: "http";
             name: string;
             headers: {
                 value: string;
