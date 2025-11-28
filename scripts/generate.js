@@ -66,9 +66,9 @@ function preprocessSchema(schema) {
   const defs = schema.$defs;
   if (!defs) return;
 
-  // First pass: fix discriminated unions (oneOf with allOf + properties pattern)
+  // First pass: fix discriminated unions (oneOf/anyOf with allOf + properties pattern)
   for (const [defName, def] of Object.entries(defs)) {
-    if (def.oneOf && def.discriminator) {
+    if (def.discriminator && (def.oneOf || def.anyOf)) {
       flattenDiscriminatedUnion(def, defs);
     }
   }
@@ -106,9 +106,10 @@ function preprocessSchema(schema) {
  */
 function flattenDiscriminatedUnion(def, defs) {
   const discriminatorProp = def.discriminator.propertyName;
+  const variants = def.oneOf || def.anyOf;
 
-  for (let i = 0; i < def.oneOf.length; i++) {
-    const variant = def.oneOf[i];
+  for (let i = 0; i < variants.length; i++) {
+    const variant = variants[i];
 
     // Skip if no allOf with $ref
     if (!variant.allOf || variant.allOf.length === 0) continue;
@@ -139,7 +140,7 @@ function flattenDiscriminatedUnion(def, defs) {
     ];
 
     // Replace variant with flattened version
-    def.oneOf[i] = {
+    variants[i] = {
       title,
       type: "object",
       properties: mergedProperties,
@@ -148,7 +149,7 @@ function flattenDiscriminatedUnion(def, defs) {
 
     // Copy description if present
     if (variant.description) {
-      def.oneOf[i].description = variant.description;
+      variants[i].description = variant.description;
     }
   }
 }
