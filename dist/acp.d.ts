@@ -182,7 +182,7 @@ export declare class TerminalHandle {
      *
      * Useful for implementing timeouts or cancellation.
      */
-    kill(): Promise<schema.KillTerminalResponse>;
+    kill(): Promise<schema.KillTerminalCommandResponse>;
     /**
      * Releases the terminal and frees all associated resources.
      *
@@ -580,7 +580,7 @@ export interface Client {
      *
      * @see {@link https://agentclientprotocol.com/protocol/terminals#killing-commands | Killing Commands}
      */
-    killTerminal?(params: schema.KillTerminalCommandRequest): Promise<schema.KillTerminalResponse | void>;
+    killTerminal?(params: schema.KillTerminalCommandRequest): Promise<schema.KillTerminalCommandResponse | void>;
     /**
      * Extension method
      *

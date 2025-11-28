@@ -386,7 +386,7 @@ export class TerminalHandle {
    *
    * Useful for implementing timeouts or cancellation.
    */
-  async kill(): Promise<schema.KillTerminalResponse> {
+  async kill(): Promise<schema.KillTerminalCommandResponse> {
     return (
       (await this.#connection.sendRequest(schema.CLIENT_METHODS.terminal_kill, {
         sessionId: this.#sessionId,
@@ -1324,7 +1324,7 @@ export interface Client {
    */
   killTerminal?(
     params: schema.KillTerminalCommandRequest,
-  ): Promise<schema.KillTerminalResponse | void>;
+  ): Promise<schema.KillTerminalCommandResponse | void>;
 
   /**
    * Extension method

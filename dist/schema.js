@@ -46,11 +46,13 @@ export const diffSchema = z.object({
     newText: z.string(),
     oldText: z.string().optional().nullable(),
     path: z.string(),
+    type: z.literal("diff"),
 });
 /** @internal */
 export const terminalSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     terminalId: z.string(),
+    type: z.literal("terminal"),
 });
 /** @internal */
 export const roleSchema = z.union([z.literal("assistant"), z.literal("user")]);
@@ -122,6 +124,7 @@ export const stopReasonSchema = z.union([
 export const currentModeUpdateSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     currentModeId: sessionModeIdSchema,
+    sessionUpdate: z.literal("current_mode_update"),
 });
 /** @internal */
 export const planEntryPrioritySchema = z.union([
@@ -199,9 +202,10 @@ export const killTerminalCommandResponseSchema = z.object({
 /** @internal */
 export const extMethodResponse1Schema = z.record(z.unknown());
 /** @internal */
-export const selectedPermissionOutcomeSchema = z.object({
+export const selectedSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     optionId: permissionOptionIdSchema,
+    outcome: z.literal("selected"),
 });
 /** @internal */
 export const cancelNotificationSchema = z.object({
@@ -244,19 +248,21 @@ export const annotationsSchema = z.object({
     priority: z.number().optional().nullable(),
 });
 /** @internal */
-export const imageContentSchema = z.object({
+export const imageSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     annotations: annotationsSchema.optional().nullable(),
     data: z.string(),
     mimeType: z.string(),
     uri: z.string().optional().nullable(),
+    type: z.literal("image"),
 });
 /** @internal */
-export const audioContentSchema = z.object({
+export const audioSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     annotations: annotationsSchema.optional().nullable(),
     data: z.string(),
     mimeType: z.string(),
+    type: z.literal("audio"),
 });
 /** @internal */
 export const resourceLinkSchema = z.object({
@@ -268,6 +274,7 @@ export const resourceLinkSchema = z.object({
     size: z.number().optional().nullable(),
     title: z.string().optional().nullable(),
     uri: z.string(),
+    type: z.literal("resource_link"),
 });
 /** @internal */
 export const embeddedResourceResourceSchema = z.union([
@@ -426,7 +433,7 @@ export const requestPermissionOutcomeSchema = z.union([
     z.object({
         outcome: z.literal("cancelled"),
     }),
-    selectedPermissionOutcomeSchema,
+    selectedSchema,
 ]);
 /** @internal */
 export const terminalExitStatusSchema = z.object({
@@ -445,16 +452,18 @@ export const createTerminalRequestSchema = z.object({
     sessionId: sessionIdSchema,
 });
 /** @internal */
-export const textContentSchema = z.object({
+export const textSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     annotations: annotationsSchema.optional().nullable(),
     text: z.string(),
+    type: z.literal("text"),
 });
 /** @internal */
-export const embeddedResourceSchema = z.object({
+export const resourceSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     annotations: annotationsSchema.optional().nullable(),
     resource: embeddedResourceResourceSchema,
+    type: z.literal("resource"),
 });
 /** @internal */
 export const newSessionResponseSchema = z.object({
@@ -479,6 +488,7 @@ export const listSessionsResponseSchema = z.object({
 export const planSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     entries: z.array(planEntrySchema),
+    sessionUpdate: z.literal("plan"),
 });
 /** @internal */
 export const clientNotificationSchema = z.union([
@@ -506,11 +516,11 @@ export const terminalOutputResponseSchema = z.object({
 });
 /** @internal */
 export const contentBlockSchema = z.union([
-    textContentSchema,
-    imageContentSchema,
-    audioContentSchema,
+    textSchema,
+    imageSchema,
+    audioSchema,
     resourceLinkSchema,
-    embeddedResourceSchema,
+    resourceSchema,
 ]);
 /** @internal */
 export const sessionCapabilitiesSchema = z.object({
@@ -519,9 +529,22 @@ export const sessionCapabilitiesSchema = z.object({
     list: sessionListCapabilitiesSchema.optional().nullable(),
 });
 /** @internal */
-export const contentChunkSchema = z.object({
+export const userMessageChunkSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     content: contentBlockSchema,
+    sessionUpdate: z.literal("user_message_chunk"),
+});
+/** @internal */
+export const agentMessageChunkSchema = z.object({
+    _meta: z.record(z.unknown()).optional(),
+    content: contentBlockSchema,
+    sessionUpdate: z.literal("agent_message_chunk"),
+});
+/** @internal */
+export const agentThoughtChunkSchema = z.object({
+    _meta: z.record(z.unknown()).optional(),
+    content: contentBlockSchema,
+    sessionUpdate: z.literal("agent_thought_chunk"),
 });
 /** @internal */
 export const availableCommandSchema = z.object({
@@ -559,11 +582,13 @@ export const promptRequestSchema = z.object({
 export const contentSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     content: contentBlockSchema,
+    type: z.literal("content"),
 });
 /** @internal */
 export const availableCommandsUpdateSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
     availableCommands: z.array(availableCommandSchema),
+    sessionUpdate: z.literal("available_commands_update"),
 });
 /** @internal */
 export const clientResponseSchema = z.union([
@@ -615,6 +640,20 @@ export const toolCallSchema = z.object({
     status: toolCallStatusSchema.optional(),
     title: z.string(),
     toolCallId: toolCallIdSchema,
+    sessionUpdate: z.literal("tool_call"),
+});
+/** @internal */
+export const toolCallUpdate1Schema = z.object({
+    _meta: z.record(z.unknown()).optional(),
+    content: z.array(toolCallContentSchema).optional().nullable(),
+    kind: toolKindSchema.optional().nullable(),
+    locations: z.array(toolCallLocationSchema).optional().nullable(),
+    rawInput: z.record(z.unknown()).optional(),
+    rawOutput: z.record(z.unknown()).optional(),
+    status: toolCallStatusSchema.optional().nullable(),
+    title: z.string().optional().nullable(),
+    toolCallId: toolCallIdSchema,
+    sessionUpdate: z.literal("tool_call_update"),
 });
 /** @internal */
 export const initializeResponseSchema = z.object({
@@ -625,17 +664,16 @@ export const initializeResponseSchema = z.object({
     protocolVersion: protocolVersionSchema,
 });
 /** @internal */
-export const toolCallUpdateSchema = z.object({
-    _meta: z.record(z.unknown()).optional(),
-    content: z.array(toolCallContentSchema).optional().nullable(),
-    kind: toolKindSchema.optional().nullable(),
-    locations: z.array(toolCallLocationSchema).optional().nullable(),
-    rawInput: z.record(z.unknown()).optional(),
-    rawOutput: z.record(z.unknown()).optional(),
-    status: toolCallStatusSchema.optional().nullable(),
-    title: z.string().optional().nullable(),
-    toolCallId: toolCallIdSchema,
-});
+export const sessionUpdateSchema = z.union([
+    userMessageChunkSchema,
+    agentMessageChunkSchema,
+    agentThoughtChunkSchema,
+    toolCallSchema,
+    toolCallUpdate1Schema,
+    planSchema,
+    availableCommandsUpdateSchema,
+    currentModeUpdateSchema,
+]);
 /** @internal */
 export const clientRequestSchema = z.union([
     initializeRequestSchema,
@@ -650,33 +688,23 @@ export const clientRequestSchema = z.union([
     z.record(z.unknown()),
 ]);
 /** @internal */
-export const requestPermissionRequestSchema = z.object({
+export const toolCallUpdateSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
-    options: z.array(permissionOptionSchema),
-    sessionId: sessionIdSchema,
-    toolCall: toolCallUpdateSchema,
+    content: z.array(toolCallContentSchema).optional().nullable(),
+    kind: toolKindSchema.optional().nullable(),
+    locations: z.array(toolCallLocationSchema).optional().nullable(),
+    rawInput: z.record(z.unknown()).optional(),
+    rawOutput: z.record(z.unknown()).optional(),
+    status: toolCallStatusSchema.optional().nullable(),
+    title: z.string().optional().nullable(),
+    toolCallId: toolCallIdSchema,
 });
 /** @internal */
-export const sessionUpdateSchema = z.union([
-    contentChunkSchema,
-    toolCallSchema,
-    toolCallUpdateSchema,
-    planSchema,
-    availableCommandsUpdateSchema,
-    currentModeUpdateSchema,
-]);
-/** @internal */
-export const agentRequestSchema = z.union([
-    writeTextFileRequestSchema,
-    readTextFileRequestSchema,
-    requestPermissionRequestSchema,
-    createTerminalRequestSchema,
-    terminalOutputRequestSchema,
-    releaseTerminalRequestSchema,
-    waitForTerminalExitRequestSchema,
-    killTerminalCommandRequestSchema,
-    z.record(z.unknown()),
-]);
+export const sessionNotificationSchema = z.object({
+    _meta: z.record(z.unknown()).optional(),
+    sessionId: sessionIdSchema,
+    update: sessionUpdateSchema,
+});
 /** @internal */
 export const agentResponseSchema = z.union([
     initializeResponseSchema,
@@ -691,10 +719,16 @@ export const agentResponseSchema = z.union([
     extMethodResponseSchema,
 ]);
 /** @internal */
-export const sessionNotificationSchema = z.object({
+export const agentNotificationSchema = z.union([
+    sessionNotificationSchema,
+    z.record(z.unknown()),
+]);
+/** @internal */
+export const requestPermissionRequestSchema = z.object({
     _meta: z.record(z.unknown()).optional(),
+    options: z.array(permissionOptionSchema),
     sessionId: sessionIdSchema,
-    update: sessionUpdateSchema,
+    toolCall: toolCallUpdateSchema,
 });
 /** @internal */
 export const clientOutgoingMessage1Schema = z.union([
@@ -721,8 +755,15 @@ export const clientOutgoingMessageSchema = clientOutgoingMessage1Schema.and(z.ob
     jsonrpc: z.literal("2.0"),
 }));
 /** @internal */
-export const agentNotificationSchema = z.union([
-    sessionNotificationSchema,
+export const agentRequestSchema = z.union([
+    writeTextFileRequestSchema,
+    readTextFileRequestSchema,
+    requestPermissionRequestSchema,
+    createTerminalRequestSchema,
+    terminalOutputRequestSchema,
+    releaseTerminalRequestSchema,
+    waitForTerminalExitRequestSchema,
+    killTerminalCommandRequestSchema,
     z.record(z.unknown()),
 ]);
 /** @internal */

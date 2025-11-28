@@ -124,7 +124,8 @@ function flattenDiscriminatedUnion(def, defs) {
     // Get discriminator value for title
     const discValue = variant.properties?.[discriminatorProp]?.const;
     const title =
-      variant.title || (discValue ? pascalCase(discValue) : `${refName}Variant`);
+      variant.title ||
+      (discValue ? pascalCase(discValue) : `${refName}Variant`);
 
     // Merge properties from ref and variant
     const mergedProperties = {
