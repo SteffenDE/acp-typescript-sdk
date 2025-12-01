@@ -85,33 +85,6 @@ export const zError = z.object({
 });
 
 /**
- * Allows the Agent to send an arbitrary notification that is not part of the ACP spec.
- * Extension notifications provide a way to send one-way messages for custom functionality
- * while maintaining protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export const zExtNotification = z.unknown();
-
-/**
- * Allows for sending an arbitrary request that is not part of the ACP spec.
- * Extension methods provide a way to add custom functionality while maintaining
- * protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export const zExtRequest = z.unknown();
-
-/**
- * Allows for sending an arbitrary response to an [`ExtRequest`] that is not part of the ACP spec.
- * Extension methods provide a way to add custom functionality while maintaining
- * protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export const zExtResponse = z.unknown();
-
-/**
  * Filesystem capabilities supported by the client.
  * File system capabilities that a client may support.
  *
@@ -406,10 +379,12 @@ export const zProtocolVersion = z.number().int().gte(0).lte(65535);
  */
 export const zInitializeRequest = z.object({
   _meta: z.object().optional(),
-  clientCapabilities: zClientCapabilities.optional().default({
-    fs: { readTextFile: false, writeTextFile: false },
-    terminal: false,
-  }),
+  clientCapabilities: zClientCapabilities
+    .optional()
+    .default({
+      fs: { readTextFile: false, writeTextFile: false },
+      terminal: false,
+    }),
   clientInfo: z.union([zImplementation, z.null()]).optional(),
   protocolVersion: zProtocolVersion,
 });
@@ -428,19 +403,6 @@ export const zReadTextFileResponse = z.object({
 export const zReleaseTerminalResponse = z.object({
   _meta: z.object().optional(),
 });
-
-/**
- * JSON RPC Request Id
- *
- * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
- *
- * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
- *
- * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
- *
- * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
- */
-export const zRequestId = z.union([z.null(), z.coerce.bigint(), z.string()]);
 
 /**
  * The sender or recipient of messages and data in a conversation.
@@ -523,6 +485,21 @@ export const zRequestPermissionResponse = z.object({
 });
 
 /**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Capabilities for the `session/fork` method.
+ *
+ * By supplying `{}` it means that the agent supports forking of sessions.
+ *
+ * @experimental
+ */
+export const zSessionForkCapabilities = z.object({
+  _meta: z.object().optional(),
+});
+
+/**
  * A unique identifier for a conversation session between a client and agent.
  *
  * Sessions maintain their own context, conversation history, and state,
@@ -542,12 +519,15 @@ export const zCancelNotification = z.object({
   sessionId: zSessionId,
 });
 
-export const zClientNotification = z.object({
-  method: z.string(),
-  params: z
-    .union([z.union([zCancelNotification, zExtNotification]), z.null()])
-    .optional(),
-});
+/**
+ * All possible notifications that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC notifications. You typically won't need
+ * to use this directly - use the notification methods on the [`Agent`] trait instead.
+ *
+ * Notifications do not expect a response.
+ */
+export const zClientNotification = z.union([zCancelNotification, z.unknown()]);
 
 /**
  * Request to create a new terminal and execute a command.
@@ -559,6 +539,25 @@ export const zCreateTerminalRequest = z.object({
   cwd: z.union([z.string(), z.null()]).optional(),
   env: z.array(zEnvVariable).optional(),
   outputByteLimit: z.union([z.number().int().gte(0), z.null()]).optional(),
+  sessionId: zSessionId,
+});
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Request parameters for forking an existing session.
+ *
+ * Creates a new session based on the context of an existing one, allowing
+ * operations like generating summaries without affecting the original session's history.
+ *
+ * Only available if the Agent supports the `session.fork` capability.
+ *
+ * @experimental
+ */
+export const zForkSessionRequest = z.object({
+  _meta: z.object().optional(),
   sessionId: zSessionId,
 });
 
@@ -663,6 +662,7 @@ export const zSessionListCapabilities = z.object({
  */
 export const zSessionCapabilities = z.object({
   _meta: z.object().optional(),
+  fork: z.union([zSessionForkCapabilities, z.null()]).optional(),
   list: z.union([zSessionListCapabilities, z.null()]).optional(),
 });
 
@@ -764,6 +764,22 @@ export const zSessionModelState = z.object({
 });
 
 /**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response from forking an existing session.
+ *
+ * @experimental
+ */
+export const zForkSessionResponse = z.object({
+  _meta: z.object().optional(),
+  models: z.union([zSessionModelState, z.null()]).optional(),
+  modes: z.union([zSessionModeState, z.null()]).optional(),
+  sessionId: zSessionId,
+});
+
+/**
  * Response from loading an existing session.
  */
 export const zLoadSessionResponse = z.object({
@@ -851,25 +867,25 @@ export const zPromptResponse = z.object({
   stopReason: zStopReason,
 });
 
+/**
+ * All possible responses that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
+ *
+ * These are responses to the corresponding `ClientRequest` variants.
+ */
 export const zAgentResponse = z.union([
-  z.object({
-    id: zRequestId,
-    result: z.union([
-      zInitializeResponse,
-      zAuthenticateResponse,
-      zNewSessionResponse,
-      zLoadSessionResponse,
-      zListSessionsResponse,
-      zSetSessionModeResponse,
-      zPromptResponse,
-      zSetSessionModelResponse,
-      zExtResponse,
-    ]),
-  }),
-  z.object({
-    error: zError,
-    id: zRequestId,
-  }),
+  zInitializeResponse,
+  zAuthenticateResponse,
+  zNewSessionResponse,
+  zLoadSessionResponse,
+  zListSessionsResponse,
+  zForkSessionResponse,
+  zSetSessionModeResponse,
+  zPromptResponse,
+  zSetSessionModelResponse,
+  z.unknown(),
 ]);
 
 /**
@@ -1021,26 +1037,26 @@ export const zPromptRequest = z.object({
   sessionId: zSessionId,
 });
 
-export const zClientRequest = z.object({
-  id: zRequestId,
-  method: z.string(),
-  params: z
-    .union([
-      z.union([
-        zInitializeRequest,
-        zAuthenticateRequest,
-        zNewSessionRequest,
-        zLoadSessionRequest,
-        zListSessionsRequest,
-        zSetSessionModeRequest,
-        zPromptRequest,
-        zSetSessionModelRequest,
-        zExtRequest,
-      ]),
-      z.null(),
-    ])
-    .optional(),
-});
+/**
+ * All possible requests that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC requests. You typically won't need
+ * to use this directly - instead, use the methods on the [`Agent`] trait.
+ *
+ * This enum encompasses all method calls from client to agent.
+ */
+export const zClientRequest = z.union([
+  zInitializeRequest,
+  zAuthenticateRequest,
+  zNewSessionRequest,
+  zLoadSessionRequest,
+  zListSessionsRequest,
+  zForkSessionRequest,
+  zSetSessionModeRequest,
+  zPromptRequest,
+  zSetSessionModelRequest,
+  z.unknown(),
+]);
 
 /**
  * Content produced by a tool call.
@@ -1270,12 +1286,15 @@ export const zSessionNotification = z.object({
   update: zSessionUpdate,
 });
 
-export const zAgentNotification = z.object({
-  method: z.string(),
-  params: z
-    .union([z.union([zSessionNotification, zExtNotification]), z.null()])
-    .optional(),
-});
+/**
+ * All possible notifications that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC notifications. You typically won't need
+ * to use this directly - use the notification methods on the [`Client`] trait instead.
+ *
+ * Notifications do not expect a response.
+ */
+export const zAgentNotification = z.union([zSessionNotification, z.unknown()]);
 
 /**
  * Request to wait for a terminal command to exit.
@@ -1307,26 +1326,55 @@ export const zWriteTextFileRequest = z.object({
   sessionId: zSessionId,
 });
 
-export const zAgentRequest = z.object({
-  id: zRequestId,
-  method: z.string(),
-  params: z
-    .union([
+/**
+ * All possible requests that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC requests. You typically won't need
+ * to use this directly - instead, use the methods on the [`Client`] trait.
+ *
+ * This enum encompasses all method calls from agent to client.
+ */
+export const zAgentRequest = z.union([
+  zWriteTextFileRequest,
+  zReadTextFileRequest,
+  zRequestPermissionRequest,
+  zCreateTerminalRequest,
+  zTerminalOutputRequest,
+  zReleaseTerminalRequest,
+  zWaitForTerminalExitRequest,
+  zKillTerminalCommandRequest,
+  z.unknown(),
+]);
+
+export const zAgentOutgoingMessage = z.intersection(
+  z.union([
+    z.object({
+      id: z.union([z.null(), z.coerce.bigint(), z.string()]),
+      method: z.string(),
+      params: z.union([zAgentRequest, z.null()]).optional(),
+    }),
+    z.intersection(
       z.union([
-        zWriteTextFileRequest,
-        zReadTextFileRequest,
-        zRequestPermissionRequest,
-        zCreateTerminalRequest,
-        zTerminalOutputRequest,
-        zReleaseTerminalRequest,
-        zWaitForTerminalExitRequest,
-        zKillTerminalCommandRequest,
-        zExtRequest,
+        z.object({
+          result: zAgentResponse,
+        }),
+        z.object({
+          error: zError,
+        }),
       ]),
-      z.null(),
-    ])
-    .optional(),
-});
+      z.object({
+        id: z.union([z.null(), z.coerce.bigint(), z.string()]),
+      }),
+    ),
+    z.object({
+      method: z.string(),
+      params: z.union([zAgentNotification, z.null()]).optional(),
+    }),
+  ]),
+  z.object({
+    jsonrpc: z.enum(["2.0"]),
+  }),
+);
 
 /**
  * Response to `fs/write_text_file`
@@ -1335,23 +1383,52 @@ export const zWriteTextFileResponse = z.object({
   _meta: z.object().optional(),
 });
 
+/**
+ * All possible responses that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
+ *
+ * These are responses to the corresponding `AgentRequest` variants.
+ */
 export const zClientResponse = z.union([
-  z.object({
-    id: zRequestId,
-    result: z.union([
-      zWriteTextFileResponse,
-      zReadTextFileResponse,
-      zRequestPermissionResponse,
-      zCreateTerminalResponse,
-      zTerminalOutputResponse,
-      zReleaseTerminalResponse,
-      zWaitForTerminalExitResponse,
-      zKillTerminalCommandResponse,
-      zExtResponse,
-    ]),
-  }),
-  z.object({
-    error: zError,
-    id: zRequestId,
-  }),
+  zWriteTextFileResponse,
+  zReadTextFileResponse,
+  zRequestPermissionResponse,
+  zCreateTerminalResponse,
+  zTerminalOutputResponse,
+  zReleaseTerminalResponse,
+  zWaitForTerminalExitResponse,
+  zKillTerminalCommandResponse,
+  z.unknown(),
 ]);
+
+export const zClientOutgoingMessage = z.intersection(
+  z.union([
+    z.object({
+      id: z.union([z.null(), z.coerce.bigint(), z.string()]),
+      method: z.string(),
+      params: z.union([zClientRequest, z.null()]).optional(),
+    }),
+    z.intersection(
+      z.union([
+        z.object({
+          result: zClientResponse,
+        }),
+        z.object({
+          error: zError,
+        }),
+      ]),
+      z.object({
+        id: z.union([z.null(), z.coerce.bigint(), z.string()]),
+      }),
+    ),
+    z.object({
+      method: z.string(),
+      params: z.union([zClientNotification, z.null()]).optional(),
+    }),
+  ]),
+  z.object({
+    jsonrpc: z.enum(["2.0"]),
+  }),
+);

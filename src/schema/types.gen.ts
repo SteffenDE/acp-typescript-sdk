@@ -33,53 +33,100 @@ export type AgentCapabilities = {
   sessionCapabilities?: SessionCapabilities;
 };
 
-export type AgentNotification = {
-  method: string;
-  params?: SessionNotification | ExtNotification | null;
-};
+/**
+ * All possible notifications that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC notifications. You typically won't need
+ * to use this directly - use the notification methods on the [`Client`] trait instead.
+ *
+ * Notifications do not expect a response.
+ */
+export type AgentNotification = SessionNotification | unknown;
 
-export type AgentRequest = {
-  id: RequestId;
-  method: string;
-  params?:
-    | WriteTextFileRequest
-    | ReadTextFileRequest
-    | RequestPermissionRequest
-    | CreateTerminalRequest
-    | TerminalOutputRequest
-    | ReleaseTerminalRequest
-    | WaitForTerminalExitRequest
-    | KillTerminalCommandRequest
-    | ExtRequest
-    | null;
-};
-
-export type AgentResponse =
+export type AgentOutgoingMessage = (
   | {
-      id: RequestId;
       /**
-       * All possible responses that an agent can send to a client.
+       * JSON RPC Request Id
        *
-       * This enum is used internally for routing RPC responses. You typically won't need
-       * to use this directly - the responses are handled automatically by the connection.
+       * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
        *
-       * These are responses to the corresponding `ClientRequest` variants.
+       * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
+       *
+       * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
+       *
+       * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
        */
-      result:
-        | InitializeResponse
-        | AuthenticateResponse
-        | NewSessionResponse
-        | LoadSessionResponse
-        | ListSessionsResponse
-        | SetSessionModeResponse
-        | PromptResponse
-        | SetSessionModelResponse
-        | ExtResponse;
+      id: null | bigint | string;
+      method: string;
+      params?: AgentRequest | null;
     }
+  | ((
+      | {
+          result: AgentResponse;
+        }
+      | {
+          error: _Error;
+        }
+    ) & {
+      /**
+       * JSON RPC Request Id
+       *
+       * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
+       *
+       * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
+       *
+       * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
+       *
+       * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
+       */
+      id: null | bigint | string;
+    })
   | {
-      error: _Error;
-      id: RequestId;
-    };
+      method: string;
+      params?: AgentNotification | null;
+    }
+) & {
+  jsonrpc: "2.0";
+};
+
+/**
+ * All possible requests that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC requests. You typically won't need
+ * to use this directly - instead, use the methods on the [`Client`] trait.
+ *
+ * This enum encompasses all method calls from agent to client.
+ */
+export type AgentRequest =
+  | WriteTextFileRequest
+  | ReadTextFileRequest
+  | RequestPermissionRequest
+  | CreateTerminalRequest
+  | TerminalOutputRequest
+  | ReleaseTerminalRequest
+  | WaitForTerminalExitRequest
+  | KillTerminalCommandRequest
+  | unknown;
+
+/**
+ * All possible responses that an agent can send to a client.
+ *
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
+ *
+ * These are responses to the corresponding `ClientRequest` variants.
+ */
+export type AgentResponse =
+  | InitializeResponse
+  | AuthenticateResponse
+  | NewSessionResponse
+  | LoadSessionResponse
+  | ListSessionsResponse
+  | ForkSessionResponse
+  | SetSessionModeResponse
+  | PromptResponse
+  | SetSessionModelResponse
+  | unknown;
 
 /**
  * Optional annotations for the client. The client can use annotations to inform how objects are used or displayed
@@ -250,53 +297,100 @@ export type ClientCapabilities = {
   terminal?: boolean;
 };
 
-export type ClientNotification = {
-  method: string;
-  params?: CancelNotification | ExtNotification | null;
-};
+/**
+ * All possible notifications that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC notifications. You typically won't need
+ * to use this directly - use the notification methods on the [`Agent`] trait instead.
+ *
+ * Notifications do not expect a response.
+ */
+export type ClientNotification = CancelNotification | unknown;
 
-export type ClientRequest = {
-  id: RequestId;
-  method: string;
-  params?:
-    | InitializeRequest
-    | AuthenticateRequest
-    | NewSessionRequest
-    | LoadSessionRequest
-    | ListSessionsRequest
-    | SetSessionModeRequest
-    | PromptRequest
-    | SetSessionModelRequest
-    | ExtRequest
-    | null;
-};
-
-export type ClientResponse =
+export type ClientOutgoingMessage = (
   | {
-      id: RequestId;
       /**
-       * All possible responses that a client can send to an agent.
+       * JSON RPC Request Id
        *
-       * This enum is used internally for routing RPC responses. You typically won't need
-       * to use this directly - the responses are handled automatically by the connection.
+       * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
        *
-       * These are responses to the corresponding `AgentRequest` variants.
+       * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
+       *
+       * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
+       *
+       * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
        */
-      result:
-        | WriteTextFileResponse
-        | ReadTextFileResponse
-        | RequestPermissionResponse
-        | CreateTerminalResponse
-        | TerminalOutputResponse
-        | ReleaseTerminalResponse
-        | WaitForTerminalExitResponse
-        | KillTerminalCommandResponse
-        | ExtResponse;
+      id: null | bigint | string;
+      method: string;
+      params?: ClientRequest | null;
     }
+  | ((
+      | {
+          result: ClientResponse;
+        }
+      | {
+          error: _Error;
+        }
+    ) & {
+      /**
+       * JSON RPC Request Id
+       *
+       * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
+       *
+       * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
+       *
+       * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
+       *
+       * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
+       */
+      id: null | bigint | string;
+    })
   | {
-      error: _Error;
-      id: RequestId;
-    };
+      method: string;
+      params?: ClientNotification | null;
+    }
+) & {
+  jsonrpc: "2.0";
+};
+
+/**
+ * All possible requests that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC requests. You typically won't need
+ * to use this directly - instead, use the methods on the [`Agent`] trait.
+ *
+ * This enum encompasses all method calls from client to agent.
+ */
+export type ClientRequest =
+  | InitializeRequest
+  | AuthenticateRequest
+  | NewSessionRequest
+  | LoadSessionRequest
+  | ListSessionsRequest
+  | ForkSessionRequest
+  | SetSessionModeRequest
+  | PromptRequest
+  | SetSessionModelRequest
+  | unknown;
+
+/**
+ * All possible responses that a client can send to an agent.
+ *
+ * This enum is used internally for routing RPC responses. You typically won't need
+ * to use this directly - the responses are handled automatically by the connection.
+ *
+ * These are responses to the corresponding `AgentRequest` variants.
+ */
+export type ClientResponse =
+  | WriteTextFileResponse
+  | ReadTextFileResponse
+  | RequestPermissionResponse
+  | CreateTerminalResponse
+  | TerminalOutputResponse
+  | ReleaseTerminalResponse
+  | WaitForTerminalExitResponse
+  | KillTerminalCommandResponse
+  | unknown;
 
 /**
  * Standard content block (text, images, resources).
@@ -520,33 +614,6 @@ export type _Error = {
 };
 
 /**
- * Allows the Agent to send an arbitrary notification that is not part of the ACP spec.
- * Extension notifications provide a way to send one-way messages for custom functionality
- * while maintaining protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export type ExtNotification = unknown;
-
-/**
- * Allows for sending an arbitrary request that is not part of the ACP spec.
- * Extension methods provide a way to add custom functionality while maintaining
- * protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export type ExtRequest = unknown;
-
-/**
- * Allows for sending an arbitrary response to an [`ExtRequest`] that is not part of the ACP spec.
- * Extension methods provide a way to add custom functionality while maintaining
- * protocol compatibility.
- *
- * See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
- */
-export type ExtResponse = unknown;
-
-/**
  * Filesystem capabilities supported by the client.
  * File system capabilities that a client may support.
  *
@@ -565,6 +632,67 @@ export type FileSystemCapability = {
    * Whether the Client supports `fs/write_text_file` requests.
    */
   writeTextFile?: boolean;
+};
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Request parameters for forking an existing session.
+ *
+ * Creates a new session based on the context of an existing one, allowing
+ * operations like generating summaries without affecting the original session's history.
+ *
+ * Only available if the Agent supports the `session.fork` capability.
+ *
+ * @experimental
+ */
+export type ForkSessionRequest = {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: { [key: string]: unknown };
+  /**
+   * The ID of the session to fork.
+   */
+  sessionId: SessionId;
+};
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response from forking an existing session.
+ *
+ * @experimental
+ */
+export type ForkSessionResponse = {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: { [key: string]: unknown };
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
+   * Initial model state if supported by the Agent
+   *
+   * @experimental
+   */
+  models?: SessionModelState | null;
+  /**
+   * Initial mode state if supported by the Agent
+   *
+   * See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
+   */
+  modes?: SessionModeState | null;
+  /**
+   * Unique identifier for the newly created forked session.
+   */
+  sessionId: SessionId;
 };
 
 /**
@@ -1289,19 +1417,6 @@ export type ReleaseTerminalResponse = {
 };
 
 /**
- * JSON RPC Request Id
- *
- * An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
- *
- * The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
- *
- * [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
- *
- * [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
- */
-export type RequestId = null | bigint | string;
-
-/**
  * The outcome of a permission request.
  */
 export type RequestPermissionOutcome =
@@ -1409,11 +1524,39 @@ export type SessionCapabilities = {
    *
    * This capability is not part of the spec yet, and may be removed or changed at any point.
    *
+   * Whether the agent supports `session/fork`.
+   *
+   * @experimental
+   */
+  fork?: SessionForkCapabilities | null;
+  /**
+   * **UNSTABLE**
+   *
+   * This capability is not part of the spec yet, and may be removed or changed at any point.
+   *
    * Whether the agent supports `session/list`.
    *
    * @experimental
    */
   list?: SessionListCapabilities | null;
+};
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Capabilities for the `session/fork` method.
+ *
+ * By supplying `{}` it means that the agent supports forking of sessions.
+ *
+ * @experimental
+ */
+export type SessionForkCapabilities = {
+  /**
+   * Extension point for implementations
+   */
+  _meta?: { [key: string]: unknown };
 };
 
 /**
